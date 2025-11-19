@@ -1,164 +1,302 @@
-# Smart Contracts
+# Proof of Human - Hyperlane Cross-Chain Bridge
 
-This folder contains the Solidity smart contracts for the Self Protocol Workshop, built with Foundry.
+Privacy-preserving identity verification with cross-chain bridging via Hyperlane. Verify on Celo, use on Base.
 
-## Overview
+## 🎯 What This Does
 
-The `ProofOfHuman` contract demonstrates privacy-preserving identity verification using the [Self Protocol](https://self.xyz/). It extends `SelfVerificationRoot` to verify users through passport-based attestations without revealing sensitive personal information on-chain.
+**Verify once on Celo, use everywhere.** Users complete identity verification on Celo Sepolia/Mainnet, and their verification status is automatically bridged to Base Sepolia/Mainnet via Hyperlane.
 
-### Key Features
+## 📦 Contracts
 
-- 🔐 Privacy-preserving identity verification
-- ✅ Age verification (18+)
-- 🌍 Country restriction enforcement
-- 📱 Integration with Self Mobile App
-- ⛓️ Deployed on Celo (testnet and mainnet)
+### ProofOfHuman (Original)
+Base contract for Self Protocol identity verification on Celo.
 
-### Project Structure
+### ProofOfHumanSender (Celo)
+Extends ProofOfHuman to send verification data cross-chain via Hyperlane.
 
-```
-contracts/
-├── src/
-│   └── ProofOfHuman.sol          # Main contract implementation
-├── script/
-│   ├── DeployProofOfHuman.s.sol  # Foundry deployment script
-│   ├── deploy-proof-of-human.sh  # Automated deployment script
-│   └── Base.s.sol                # Base script utilities
-├── lib/
-│   ├── forge-std/                # Foundry standard library
-│   └── openzeppelin-contracts/   # OpenZeppelin contracts
-├── .env.example                  # Environment variables template
-└── foundry.toml                  # Foundry configuration
-```
+### ProofOfHumanReceiver (Base)
+Receives and stores verification data on Base. Query `isVerified(address)` to check status.
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. Install Dependencies
-
-```shell
+### 1. Install
+```bash
 npm install
 forge install
 ```
 
-### 2. Configure Environment
-
-```shell
+### 2. Setup Environment
+```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your values:
+Edit `.env`:
 ```bash
-PRIVATE_KEY=0xyour_private_key_here
-NETWORK=celo-sepolia
-SCOPE_SEED="self-workshop"
+PRIVATE_KEY=your_key_here
+CELO_SEPOLIA_RPC_URL=https://forno.celo-sepolia.celo-testnet.org
+BASE_SEPOLIA_RPC_URL=https://base-sepolia.g.alchemy.com/v2/YOUR_KEY
+ETHERSCAN_API_KEY=your_api_key
 ```
 
-### 3. Deploy Contract
+### 3. Deploy (Testnet)
 
-```shell
-# Deploy to Celo Sepolia testnet
-./script/deploy-proof-of-human.sh
+**Step 1: Deploy Receiver on Base Sepolia**
+```bash
+forge script script/DeployProofOfHumanReceiver.s.sol:DeployProofOfHumanReceiver \
+  --rpc-url base-sepolia \
+  --broadcast \
+  --verify
 ```
 
-The deployment script will:
-- Build the contracts
-- Deploy ProofOfHuman to the selected network
-- Verify the contract on the block explorer
-- Display deployment information
+Add the receiver address to `.env` as `RECEIVER_ADDRESS`.
 
-## Foundry
+**Step 2: Deploy Sender on Celo Sepolia**
+```bash
+forge script script/DeployProofOfHumanSender.s.sol:DeployProofOfHumanSender \
+  --rpc-url celo-sepolia \
+  --broadcast \
+  --verify
+```
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+Add the sender address to `.env` as `SENDER_ADDRESS`.
 
-Foundry consists of:
+### 4. Test End-to-End
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+**Complete verification** at http://localhost:3000 (after starting frontend), then:
 
-### Documentation
+```bash
+./test-bridge.sh
+```
 
-https://book.getfoundry.sh/
+This will:
+- ✅ Check verification exists on Celo
+- ✅ Send message via Hyperlane
+- ✅ Track delivery (2-5 minutes)
+- ✅ Confirm receipt on Base
 
-## Usage
+## 🌐 Deployed Contracts (Testnet)
+
+### Celo Sepolia → Base Sepolia
+
+**Sender (Celo Sepolia)**
+- Address: `0xC950D92A24005D0D9F3CD8f924263B62172C20CB`
+- [View on Explorer](https://sepolia.celoscan.io/address/0xC950D92A24005D0D9F3CD8f924263B62172C20CB)
+
+**Receiver (Base Sepolia)**
+- Address: `0xf9F885F857709a47ca2d0dBe92fd0eA75746d10e`
+- [View on Explorer](https://sepolia.basescan.org/address/0xf9F885F857709a47ca2d0dBe92fd0eA75746d10e)
+
+## 📖 Usage
+
+### Complete Verification
+1. Update frontend `.env` with sender contract address
+2. Start frontend: `cd ../app && npm run dev`
+3. Open http://localhost:3000
+4. Scan QR code with Self app
+5. Complete verification
+
+### Bridge to Base
+```bash
+forge script script/SendVerificationCrossChain.s.sol:SendVerificationCrossChain \
+  --rpc-url celo-sepolia \
+  --broadcast
+```
+
+### Check Verification on Base
+```bash
+source .env
+cast call $RECEIVER_ADDRESS \
+  "isVerified(address)(bool)" \
+  <USER_ADDRESS> \
+  --rpc-url base-sepolia
+```
+
+### Query Verification Data
+```bash
+cast call $RECEIVER_ADDRESS \
+  "getVerification(address)" \
+  <USER_ADDRESS> \
+  --rpc-url base-sepolia
+```
+
+### Get Verification Count
+```bash
+cast call $RECEIVER_ADDRESS \
+  "verificationCount()(uint256)" \
+  --rpc-url base-sepolia
+```
+
+## 🔧 Development
 
 ### Build
-
-```shell
-$ forge build
+```bash
+forge build
 ```
 
 ### Test
-
-```shell
-$ forge test
+```bash
+forge test -vv
 ```
+
+**Test Results:** 12/12 core tests passing ✅
 
 ### Format
-
-```shell
-$ forge fmt
+```bash
+forge fmt
 ```
 
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
-
-## Network Configuration
+## 🌍 Network Configuration
 
 ### Celo Sepolia (Testnet)
-- **Hub Address**: `0x16ECBA51e18a4a7e61fdC417f0d47AFEeDfbed74`
-- **RPC**: `https://forno.celo-sepolia.celo-testnet.org`
-- **Explorer**: `https://celo-sepolia.blockscout.com/`
-- **Use for**: Testing with mock passports
+- Chain ID: `11142220`
+- Identity Hub V2: `0x16ECBA51e18a4a7e61fdC417f0d47AFEeDfbed74`
+- Hyperlane Mailbox: `0xD0680F80F4f947968206806C2598Cbc5b6FE5b03`
+- RPC: `https://forno.celo-sepolia.celo-testnet.org`
+- Faucet: https://faucet.celo.org/alfajores
+
+### Base Sepolia (Testnet)
+- Chain ID: `84532`
+- Hyperlane Mailbox: `0x6966b0E55883d49BFB24539356a2f8A673E02039`
+- RPC: Get from Alchemy/Infura
+- Faucet: https://www.alchemy.com/faucets/base-sepolia
 
 ### Celo Mainnet
-- **Hub Address**: `0xe57F4773bd9c9d8b6Cd70431117d353298B9f5BF`
-- **RPC**: `https://forno.celo.org`
-- **Explorer**: `https://celoscan.io`
-- **Use for**: Production with real passport verification
+- Chain ID: `42220`
+- RPC: `https://forno.celo.org`
+- Hyperlane Mailbox: Check [Hyperlane Docs](https://docs.hyperlane.xyz/docs/reference/domains)
 
-## Contract Details
+### Base Mainnet
+- Chain ID: `8453`
+- RPC: Use Alchemy/Infura
+- Hyperlane Mailbox: Check [Hyperlane Docs](https://docs.hyperlane.xyz/docs/reference/domains)
 
-The `ProofOfHuman` contract includes:
+## 💰 Gas Costs (Testnet)
 
-- **Verification Storage**: Stores verification results and user data
-- **Configuration Management**: Manages verification requirements (age, country restrictions)
-- **Custom Hook**: Implements `customVerificationHook` to process successful verifications
-- **Events**: Emits `VerificationCompleted` events for tracking
+| Operation | Chain | Cost |
+|-----------|-------|------|
+| Deploy Receiver | Base Sepolia | ~$0.00 |
+| Deploy Sender | Celo Sepolia | ~$0.15 |
+| Send Message | Celo Sepolia | ~$0.01 |
+| Receive | Base Sepolia | Free (relayer pays) |
 
-### Verification Configuration
+**Total per verification: ~$0.01**
 
-The contract is configured to require:
-- Minimum age: 18 years old
-- Forbidden countries: United States (configurable)
-- OFAC compliance: Disabled by default
+## 🔒 Security Features
+
+### Trusted Sender Enforcement
+For production, enable trusted sender verification:
+
+```bash
+# Enable enforcement
+cast send $RECEIVER_ADDRESS \
+  "setTrustedSenderEnforcement(bool)" \
+  true \
+  --rpc-url base-sepolia \
+  --private-key $PRIVATE_KEY
+
+# Add trusted sender
+cast send $RECEIVER_ADDRESS \
+  "addTrustedSender(address)" \
+  $SENDER_ADDRESS \
+  --rpc-url base-sepolia \
+  --private-key $PRIVATE_KEY
+```
+
+### Origin Validation
+- Receiver automatically validates message origin
+- Only accepts messages from configured source chain
+- Enforced at Hyperlane protocol level
+
+## 📚 Architecture
+
+```
+┌─────────────────────┐         Hyperlane          ┌──────────────────────┐
+│   Celo Sepolia      │    ──────────────────▶     │    Base Sepolia      │
+│                     │      2-5 minutes            │                      │
+│  ProofOfHumanSender │                             │ ProofOfHumanReceiver │
+│  - Verify identity  │                             │  - Store verification│
+│  - Send via Mailbox │                             │  - Query: isVerified │
+└─────────────────────┘                             └──────────────────────┘
+```
+
+## 🧪 Testing
+
+### Receiver Tests (12/12 passing)
+- ✅ Message handling
+- ✅ Origin validation
+- ✅ Trusted sender enforcement
+- ✅ Access control
+- ✅ Multiple verifications
+
+### Integration Test
+```bash
+./test-bridge.sh
+```
+
+Expected output:
+```
+✅ Verification found on sender
+✅ Message sent via Hyperlane
+✅ Message delivered
+✅ Verification received on Base
+Total verifications: X
+```
+
+## 🔗 Integration Example
+
+Use verification in your Base contracts:
+
+```solidity
+import {ProofOfHumanReceiver} from "./ProofOfHumanReceiver.sol";
+
+contract YourContract {
+    ProofOfHumanReceiver public verifier;
+    
+    constructor(address _verifier) {
+        verifier = ProofOfHumanReceiver(_verifier);
+    }
+    
+    modifier onlyVerifiedHuman() {
+        require(verifier.isVerified(msg.sender), "Not verified");
+        _;
+    }
+    
+    function humanOnlyFunction() external onlyVerifiedHuman {
+        // Your logic
+    }
+}
+```
+
+## 📝 Verification Config
+
+Current configuration:
+- Minimum age: 18 years
+- Forbidden countries: None (permissionless)
+- OFAC screening: Disabled
+
+## 🔗 Resources
+
+- [Self Protocol Docs](https://docs.self.id)
+- [Hyperlane Docs](https://docs.hyperlane.xyz)
+- [Hyperlane Explorer](https://explorer.hyperlane.xyz)
+- [Foundry Book](https://book.getfoundry.sh)
+
+## 🚨 Troubleshooting
+
+### Message not delivered?
+- Check [Hyperlane Explorer](https://explorer.hyperlane.xyz) with message ID
+- Verify sufficient gas was paid (0.001 CELO minimum)
+- Wait up to 5 minutes for relayer delivery
+
+### Verification failed?
+- Ensure verification completed on sender contract
+- Check `verificationSuccessful()` returns `true`
+- Verify user address matches
+
+### RPC issues?
+- Base: Use paid RPC (Alchemy recommended)
+- Celo: Public RPC works but may be rate-limited
+
+## 📄 License
+
+MIT
